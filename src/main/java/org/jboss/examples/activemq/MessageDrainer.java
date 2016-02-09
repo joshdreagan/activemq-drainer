@@ -42,17 +42,27 @@ public class MessageDrainer {
 
   private static class Options {
 
-    @Option(name = "--kahaDB", usage = "Sets the location of the KahaDB directory.", required = true)
-    String kahaDB;
+    File kahaDB;
 
     @Option(name = "--username", usage = "Sets the username for the target broker.")
     String username;
 
-    @Option(name = "--password", usage = "Sets the password for the target broker.")
-    String password = "";
+    @Option(name = "--password", usage = "Sets the password for the target broker.", depends = { "--username" })
+    String password;
 
     @Option(name = "--brokerURL", usage = "Sets the URL for the target broker.", required = true)
     String brokerURL;
+
+    @Option(name = "--help", usage = "Prints this help message and exits.", help = true, hidden = true)
+    boolean help = false;
+
+    @Option(name = "--kahaDB", usage = "Sets the location of the KahaDB directory.", required = true)
+    void setKahaDB(File kahaDB) throws IOException {
+      if (!kahaDB.exists() || !kahaDB.isDirectory()) {
+        throw new IOException("The --kahaDB option must point to a valid KahaDB directory.");
+      }
+      this.kahaDB = kahaDB;
+    }
   }
 
   public static void main(String[] args) throws Throwable {
@@ -61,19 +71,20 @@ public class MessageDrainer {
     CmdLineParser cmdLineParser = new CmdLineParser(cmdLineOptions);
     try {
       cmdLineParser.parseArgument(args);
+      if (cmdLineOptions.help) {
+        cmdLineParser.printUsage(System.out);
+        System.exit(0);
+      }
     } catch (CmdLineException e) {
       System.out.println(String.format("Error parsing command line arguments: %s", e.getMessage()));
       cmdLineParser.printUsage(System.out);
-    }
-    
-    File kahaDB = new File(cmdLineOptions.kahaDB);
-    if (!kahaDB.exists() || !kahaDB.isDirectory()) {
-      throw new IOException("The --kahaDB option must point to a valid KahaDB directory.");
+      System.exit(1);
     }
 
     BrokerService broker = new BrokerService();
+    broker.setUseJmx(false);
     PersistenceAdapter persistenceAdapter = new KahaDBPersistenceAdapter();
-    persistenceAdapter.setDirectory(kahaDB);
+    persistenceAdapter.setDirectory(cmdLineOptions.kahaDB);
     broker.setPersistenceAdapter(persistenceAdapter);
     broker.start();
 
